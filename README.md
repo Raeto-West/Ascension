@@ -1,2 +1,0 @@
-# Ascension
-Text Adventure Game

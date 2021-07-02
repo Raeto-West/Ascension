@@ -1,0 +1,3596 @@
+# Ascension
+Text Adventure Game
+
+
+            
+
+                ; A   S   C   E   N   S   I   O   N   
+
+                ; version 20 1 2021
+
+
+                ; £ signs are quries
+
+
+                ; BUGS  droppping object names with spaces 
+                ; 
+
+
+                ; multi worded commands do not work ( not sure why )
+
+             
+
+                ; 
+
+                ;  ISSUES - 
+                ;  typing in the user window and hitting return gets an object if object and player area match ( homing the cursor too early after user text ? )
+                ;  pressing R <enter> places a full stop at lower middle screen and generally appearing
+                ;  user text window not displaying user text
+                ; 
+
+                ; IMPROVMENTS -
+                
+
+
+;*******************************************************************************
+; M E M O R Y   M A P
+;*******************************************************************************
+
+
+                ; bootloader
+                ; Start Address         : 1025 $401
+                ; Prg 1 End Address     : 1040 $410 ( 16 bytes )
+
+                ; 238 bytes free        : $411 - $4ff     
+
+
+
+        ; ROOMS
+                ; start                 : $0500 
+                ; end                   : $3bb0 ( 14k )               
+
+                ; 78 bytes free         : $3bb1 $3bff
+
+                ; off screen scroll     : $3c00 $3de1             480 bytes  2 x 240 = 12 lines of text
+
+                ; messages              ; $3de2 - $3e5f         125 chrs ( 25 x 5 )
+
+
+        ; MAIN
+                ; start                 : $3e60
+
+                ; end                   : $77ff
+
+                ; program end address not exceed $77ff ( under screen memory )
+
+
+
+;*******************************************************************************
+; M E M O R Y   L O C A T I O N S
+;*******************************************************************************
+
+
+; $411 holds length of string
+; $412  "    length of command
+; $413  "    length of word
+; $414 used in the detect objects routine for screen formatting objects
+; $415 flag used in enter/exit routine, opens and closes rooms
+; $416 flag used for unrecognised commands. set in string_interpeter and used in clear_input
+; $418 Y counter for object length in wipe_objects
+; $419 X counter / outer loop for line formatting in wipe_objects
+; $41a - 428 ( 14 bytes ) stores description in wipe_objects
+; $42b flash inventory if #1
+; $42c flash compass if #1    £ no longer used
+; $42f double command tab Y
+; $430 smart objects flag
+; $436 holds room layout / used in tab room / read by print_room and stored in room description
+; $437 holds player position within room layout / used in tab room / read by print_room and stored in room description
+; $438 room area counter used in tab_room / highlighter / detect object / get / drop
+; $439 - 440 room pointers
+; $441 room pointer LSB
+; $442 room pointer MSB
+; $446 counter in print room
+; $446 switch in highlighter / if room highlight data = 1 then switch to highlighting second textblock
+; $447 used in check direction possible to temp hold a value for adding
+; $448 alternative chr set switch used in print_room
+
+; $449 - $450 stores compass data in room description ( print_room )
+; $451 *
+; $452 *
+; $453 *
+; $454 *
+; $455 *
+; $456 *
+; $457 *
+; $458 *
+; $459 stores number in highlighter
+; $45a absolute room pointer LSB
+; $45b absolute room pointer MSB
+; $45c used in print_room as a Y pointer LSB off screen scrolling area $3c00
+; $45d used in print_room as a Y pointer MSB                 "
+; $45e used in print_room / holds character to be stored into off screen scroll area
+; $462 nothing here flag
+; $463 reload room page ( check direction possible )
+; $464 temp player location ( room loading Y = 256 bytes )
+; $465 player location
+; $466 temp player location
+; $467 which location was chosen ( check direction possible )
+; $468 inventory count
+; $469 text scroll speed
+; $46a scrolling
+; $46b scrolling
+; $46c scrolling
+; $46d scrolling
+; $46e scrolling
+; $46f scrolling
+; $470 scrolling
+; $471 scrolling
+; $472 scrolling
+; $473 room open or closed ( first data point in room description ) used in print room
+; $474 *
+; $475 map flag / used in print map
+; $476 temp store of A in print_messge
+; $477 temp X store in print_message
+; $478 *
+; $479 word counter in highlight data
+; $47a used in check_direction_possible / holds high byte and lsr manipulated
+; $47b used in screen_up as a line counter in the last_line routine
+; $47c x
+; $47d used to read LSB of object location in detect objects
+; $47e used to read MSB of object location in detect objects
+; $47f detect objects / area of layout
+; $484 used in tab inventory / holds y count
+     
+
+
+
+;*******************************************************************************
+;  V A R I B L E S                                                             
+;******************************************************************************* 
+
+
+;objects
+
+
+object_length$          = 16    ; max object length in bytes
+carry_limit$            =  5    ; max objects carried by player
+
+;commands
+
+command_byte$           = 55    ; + 1 
+single_command_byte$    =  9    ; + 1
+
+;player interface
+
+buffer_length$          = 16
+user_screen_width$      = 21
+
+;scroll_location_text
+
+screen_width$           =  40
+scroll_speed_H$         =  40
+scroll_speed_V$         = 180
+scroll_text_speed$      = 100
+
+
+;*******************************************************************************
+; R O O M S
+;*******************************************************************************
+
+
+
+;*******************************************************************************
+;       I N V E N T O R Y   R O O M                     $0500
+;*******************************************************************************  
+
+        *=$0500         ; this is the first room executed by program                  
+                        
+        byte 1          ; room is open                     
+        byte 0                  
+        byte 128        ; player start position must be same as first real room            
+
+
+                        ; directions
+
+        byte $00,$00       
+        byte $00,$00               
+        byte $5b,$05    ; 1st direction ( george town )
+        byte $00,$00
+
+
+        *=$050b         ; Inventory / objects carried by player are stored here 80 bytes
+
+        byte 0,0,0,0,0,0,0,0,0,0
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        byte 0,0,0,0,0,0,0,0,0,0  
+        
+
+        *****  T E S T   R O O M S  *****
+        
+        
+;*******************************************************************************
+;       G E O R G E   T O W N   H A R B O U R           $055b        
+;*******************************************************************************
+
+        byte 9          ; room open or closed                       0 mem $473
+        byte 246        ; room layout pattern                       1 mem $436
+        byte 128        ; player start position within room layout  2 mem $437
+
+                        ; this room connects to the following rooms 
+                        ;                                           3 - 10 mem $449 - $450
+
+        byte $00,$00    ; N              
+        byte $bf,$06    ; S                     
+        byte $5f,$06    ; E  post office    
+        byte $00,$00    ; W                               
+                                         
+                        ; 128,64,32,16   * * * *
+                        ;  0, 4, 2, 0      * *                  room layout pattern = 246
+        byte 1,2,3,4
+        byte 0,39,58,0  ; highlighted words                       11 - 18 mem $451 - $458
+
+                        ; title ( 12 byte allowance ) unused bytes must be spaces ( 240 )
+
+        byte 1,21,48,1,31,101,5,112
+        byte 240,240,240,240                    
+
+                        ; room description 31
+
+        byte 4,92,248,98,123,242,111,47,163
+        byte 88,131,82,184,13,101,246,209,247
+        byte 83,109,255,72,242,250,40,105
+        byte 31,39,191,101,246,209,248,92,109
+        byte 242,240,7,40,111,146,6,22,210
+        byte 111,210,143,47,9,22,96,4,240,5
+        byte 70,223,47,2,82,111,100,27,246
+        byte 95,70,13,101,246,209,241,40,111
+        byte 4,92,240,5,73,159,3,71,191,47
+        byte 177,120,31,5,85,176,13,246,95
+        byte 109,31,5,24,111,47,3,72,212,112
+        byte 1,240,7,73,146,1,16,13,242,127
+        byte 89,191,255,5,72,31,226,127,43
+        byte 7,74,24,246,210,111,4,92,246
+        byte 50,7,25,247,83,109,13,240
+        byte 178,48,6,250,149,203,143,53,153
+        byte 244,127,39,191,47,165,155,240
+        byte 5,71,191,255,255,2,149,5,143,109
+        byte 53,192,1,223,4,92,13,240,4,92
+        byte 242,49,253,199,1,48,4,247,80
+        byte 5,13,255,4,92,250,92,155,241,38
+        byte 242,253,83,129,13,240,3,71,191
+        byte 47,98,7,19,127,133,246,210,111
+        byte 4,92,250,39,243,16,1,36,127
+        byte 4,92,63,23,19,1,4,13
+        byte 15
+
+        
+        
+;*******************************************************************************
+;       P O S T   O F F I C E                          $065f
+;*******************************************************************************                  
+
+        byte 1        
+        byte 240     
+        byte 128     
+                       
+        byte $00,$00                  
+        byte $00,$00              
+        byte $bf,$06    ; pine forest    
+        byte $5b,$05    ; George Town                                
+                                         
+        byte 1,2,3,4
+        byte 0,0,0,0  
+
+        byte 11,88,111,80,3,3,74,16
+        byte 240,240,240,240
+
+        byte 4,92,242,49,245,198,132,177,242
+        byte 240,5,212,97,240,5,40,209,191
+        byte 165,102,32,1,16,13,246,212,143
+        byte 210,143,117,5,240,2,17,127,165
+        byte 112,7,19,97,191,101,242,240,11
+        byte 88,111,255,80,3,3,74,31,39,191
+        byte 7,73,146,1,31,134,83,16,13,15
+
+;*******************************************************************************
+;      F O R E S T                                 $06bf
+;*******************************************************************************
+
+        byte 3
+        byte 234
+        byte 128
+
+        byte $5b,$05
+        byte $00,$00
+        byte $00,$00
+        byte $5f,$06
+
+        byte 1,2,0,0
+        byte 3,0,0,0
+
+        byte 11,71,31,3,83,24,96
+        byte 255,255,255,255,255
+
+        byte 4,92,242,49,244,127,47,11,71,3
+        byte 1,3,83,24,96,13,246,209,240,1
+        byte 53,199,191,72,249,70,97,49,191
+        byte 5,70,223,11,71,31,113,27,145,143
+        byte 39,191,72,248,80,3,111,246,95
+        byte 5,41,6,245,112,13,246,95,109
+        byte 31,133,198,223,4,92,248,17,242
+        byte 253,198,255,39,191,101,246,209
+        byte 247,83,109,242,249,32,6,16,1,15
+        
+
+;*******************************************************************************
+;  B O O T        10 SYS (15842)                                         
+;******************************************************************************* 
+
+; 10 SYS (15968)
+
+*=$0401
+
+        BYTE    $0E, $04, $0A, $00, $9E, $20, $28,  $31, $35, $39, $36, $38, $29, $00, $00, $00
+
+
+;**************************************************************************************************************************************************************
+;  S T A R T                                                             
+;**************************************************************************************************************************************************************
+
+        *=$3e60
+
+start_program
+
+
+        jsr clear_screen
+        jsr splash
+        jsr getkey
+        jsr clear_screen
+        jsr title_display
+        jsr IRQ_title
+        jsr getkey  
+        
+ 
+       
+        jsr int_start                   ; inital values        
+        jsr int_direction_all           ; used by the text scroll routines
+        jsr clear_screen  
+        jsr IRQ_norm
+        
+load_first_location                     ; clarence bay    
+
+        lda #$3e                        ; > cursor marker
+        sta $83c0
+
+        lda #5                          ; text delay speed
+        sta $467
+        jmp scroll_text_east
+       
+
+;*******************************************************************************
+;  U P D A T E   R O O M                                                            
+;******************************************************************************* 
+       
+update_room        ; takes off screen scroll area text and puts it on screen / used as a screen refresh in highlighter
+                   ; or get and drop objects     
+
+        ldx #12
+        lda #32
+
+@loop0
+        sta $3c1b,x     ; clear any object that may exist  ( top of screen )
+        dex
+        bne @loop0
+
+        lda #$00        ; point to off screen scroll area
+        sta $0
+        lda #$3c
+        sta $1
+
+        ldy #0
+@loop1
+        lda ($0),y
+        sta $8000,y     ; print
+        dey
+        bne @loop1
+      
+        ldy #0
+        sty $0
+        inc $1
+        
+@loop2
+       
+        lda ($0),y
+        sta $8100,y
+        dey
+        bne @loop2
+
+        rts
+
+;*******************************************************************************
+;  I N T   S T A R T                                                             
+;******************************************************************************* 
+
+int_start
+
+        lda #0
+        sta $411        ; length of string
+        sta $412        ; length of command
+        sta $413        ; length of word
+        sta $415        ; used as a toggle in the enter_exit routine        
+        sta $416        ; flag used for question mark / unrecognised command / string_interpreter and clear_input routines
+        sta $419
+        sta $42b        ; flag used to flash inventory ( nothing to drop )
+        sta $42c        ; flag used to flash compass £ no longer used
+        
+     
+   
+        
+        sta $468       ; keeps track of objects carried by player
+       
+
+        sta $c6
+
+        sta $0          ; clear Y pointer
+        sta $1
+                        ; player_start_position / 1st room starts at $0500
+                                                
+        lda #$00        ; first room location LSB    
+        sta $45a        ; absolute room pointer
+
+        lda #$05        ; first room location MSB       
+        sta $45b        ; absolute room pointer
+      
+        lda #0
+        sta $438        ; tab_room / highlighter / area counter
+     
+        lda #9
+        sta $47c
+
+        lda #0
+        sta $484        ; used in tab inventory / holds y count
+        sta $48f
+        sta $493
+
+        rts
+
+
+;*******************************************************************************
+;   I N T   D I R E C T I O N   A L L                                                         
+;******************************************************************************* 
+
+int_direction_all       
+
+        ldx #0                                
+        stx $472         ; all these memory locations are used to setup the scrolling of text
+        stx $471                             
+        stx $46f                         
+        
+        lda #240
+        sta $470                        
+        rts
+
+;*******************************************************************************
+;  I N T   N O R T H                                                            
+;******************************************************************************* 
+        
+int_north
+
+        lda #210                   ; text scroll speed ( used in the delay routine )
+        sta $469                               
+
+        ldx #0
+        stx $46a
+        
+        lda #17
+        sta $46d                               ; scroll 15 lines    10 + 5 blank lines
+        
+        lda #240
+        sta $46c
+        sta $46b
+        rts
+
+;*******************************************************************************
+;  I N T   S O U T H                                                            
+;******************************************************************************* 
+               
+int_south
+        
+        lda #190
+        sta $469                               ; text scroll speed
+        
+        ldx #0
+        stx $46c
+        stx $46b
+        stx $46e
+        
+        lda #17
+        sta $46d
+        rts
+
+;*******************************************************************************
+;   I N T   W E S T                                                            
+;******************************************************************************* 
+ 
+int_west
+        
+        lda #60
+        sta $469                               ; text scroll speed
+        
+        lda #240
+        sta $46e
+        
+        lda #240
+        sta $46f
+        
+        lda #39
+        sta $470
+        rts
+
+;*******************************************************************************
+;  I N T   E A S T                                                             
+;******************************************************************************* 
+
+int_east
+
+        lda #60
+        sta $469                               ; text scroll speed
+
+        ldy #0                                 
+        sty $46e                               ; both these locations are used as x & y in the screen capture routine
+        sty $46f                               ; just incase you were wondering    
+        rts
+
+
+
+
+;*******************************************************************************
+;  I R Q   S E T U P                                                           
+;******************************************************************************* 
+
+
+IRQ_cursor
+
+        lda #<cursor
+        sta $90
+        lda #>cursor
+        sta $91        
+        rts
+
+IRQ_title
+
+        
+        lda #<IRQ_hieroglyphs
+        sta $90
+        lda #>IRQ_hieroglyphs
+        sta $91       
+        rts
+
+IRQ_norm
+
+        
+        lda #$55
+        sta $90
+        lda #$e4
+        sta $91       
+        rts
+        
+
+;*******************************************************************************
+;   G E T   K E Y                                                           
+;******************************************************************************* 
+
+getkey      
+        
+        jsr $ffe4               ; kernal routine for 'get a key'                               
+        beq getkey
+        rts
+
+
+;*******************************************************************************
+;  C U R S O R                                                            
+;******************************************************************************* 
+
+cursor                          ; IRQ driven routine that -
+                                ; positions the cursor, detects out of bounds typing, records length of string,
+                                ; corrects uppercase input and detects tabbing
+      
+  
+
+;        lda $473        ; tab
+;        sta $8320
+
+;        lda $491        ; room open or locked
+;        sta $8322
+
+;        lda $493        ; check drop area locked 
+;        sta $8324
+
+      
+
+        lda #$c1                ; home cursor
+        sta $c4
+        lda #$83
+        sta $c5
+
+@start
+
+        lda $c6                 ; if cursor = 0
+        cmp #0
+        beq @exit               ; then end routine
+                                ; else check
+
+@check                          ; cursor position > 0
+     
+        lda $83c1               ; copy of key press
+        cmp #32                
+        beq @space_check        ; if cursor < 2 and a = space then check
+        cmp #96                 
+        beq @tab_invent         ; if cursor < 2 and a = shift space then tab the inventory
+
+        lda $98                 ; if player pressed shift key
+        cmp #1                  ; 
+        beq @del_line           ; then delete entire line
+        
+@check_key_boundary             ; else commence cursor checks                  
+
+        lda $c6
+        cmp #buffer_length$     ; if cursor position < buffer_length
+        bcc @done               ; then done
+        lda #buffer_length$     ; else
+        sta $c6                 ; let cursor position = buffer_length   
+        jmp @done
+
+@space_check
+       
+        lda #0                  ; let cursor pos = 0
+        sta $c6
+   
+        lda #0
+        sta $496
+
+        jsr tab_room            ; visually moves player inside room  /  print_room_layout
+        jmp @exit   
+    
+@done 
+        lda $c6
+        sta $411                ; store length of string typed by player
+        tax                     ; and check if uppercase characters have been used
+@loop
+        lda $83c0,x
+        cmp #65                 ; uppercase ?
+        bcc @exit               ; no
+        
+@convert                        ; yes
+        sec
+        sbc #64                 ; then covert it back to lowercase
+        sta $83c0,x
+@exit      
+       
+        jmp $e455               ; and resume normal operations
+
+@del_line
+
+        lda $c6                 ; get cursor position
+        tax  
+        inx
+        lda #32                 ; erase line with spaces
+@del    dex
+        sta $83c1,x
+        bne @del
+        stx $c6                 ; let cursor = 0
+        jmp @exit
+
+
+@tab_invent
+
+        lda $468        ; objects held by player > 0
+        cmp #0                 
+        bne @tab_start  ; yes
+
+        lda #0          ; no
+        sta $c6         ; home cursor
+        jmp @exit       ; and exit
+
+@tab_start
+
+        lda $c6         ; if cursor pos > 1
+        cmp #1          
+        bne @exit       ; then exit
+
+        lda #0          ; else let cursor = 0
+        sta $c6
+               
+        lda $484        ; tab
+        cmp $468        ; if tab > objects carried
+        bcs @tab_adj    ; then let tab = 1
+        inc $484        ; else increase tab position
+        jmp @tab_con
+
+@tab_adj
+        lda #1     
+        sta $484
+
+@tab_con
+        jsr tab_invent  ; highlight next object in the inventory
+        jmp @exit       ; then exit
+
+
+
+
+
+;*******************************************************************************
+;  S P L A S H                                                        
+;******************************************************************************* 
+        
+splash
+
+        jsr int_start        
+        lda #14                                 ; lowercase
+        sta $e84c
+        
+        ldx #00
+                
+display_splash
+        
+        lda logo1,x
+        sta $8000,x
+        
+        lda logo2,x
+        sta $80c8,x
+        
+        lda logo3,x
+        sta $8190,x
+        
+        lda logo4,x
+        sta $8258,x
+        
+        lda logo5,x
+        sta $8320,x
+        
+        inx
+        cpx #$c8
+        bne display_splash
+       
+        ldx #0
+        rts
+
+title_display
+
+        jsr int_start        
+                
+        ldx #39
+        ldy #0       
+                
+display_logo
+        
+        lda title,x
+        sta $8051,x
+        lda hieroglyphs,x
+        sta $8119,x
+        dex
+        bne display_logo
+
+        rts
+
+;*******************************************************************************
+;  I R Q   H I E R O G L Y P H S                                                             
+;******************************************************************************* 
+        
+IRQ_hieroglyphs
+
+        ldy #0       
+ 
+        lda #$0c                ; activate lowercase
+        sta $e84c
+loop_A       
+        ldx #0
+loop_B  
+        inx
+timer        
+        cpx #165                ; fine tune rastor timer 
+        bne loop_B
+        iny
+        cpy #7                  ; place hieroglyphs on screen (roughly center) cpy #n is vertical height
+        bne loop_A
+        
+        lda #$0e                ; activate uppercase
+        sta $e84c
+        
+        jsr $ffe4               ; kernal routine for 'get a key'                                    
+        jmp $e455               ; IRQ interrupt routine
+        beq IRQ_hieroglyphs     ; no key was detected
+     
+        rts                     ; key pressed, routine done
+
+;*******************************************************************************
+;  P R I N T   M E S S A G E                                                            
+;******************************************************************************* 
+
+print_message
+                                ; this routine uses the Huffman Code which is found in the print_room section
+
+        sta $476                ; any routine that prints a message must set a & y before arriving here
+        sty $474                ; together they point to the beginning of the message to be printed
+                                ; a = page number and y = index
+        
+        ldy #125                ; clean_loop
+
+@clean_room  
+
+        lda #$e2                ; point to message area LSB
+        sta $0   
+                             
+        lda #$3d                ; point to message area MSB
+        sta $1    
+
+        lda #32                 ; blank chr
+
+@clean_loop                     ; erase any existing data in the message area ( $3de2 - $3e5f ) 125 bytes                                                    
+        
+        sta ($0),y              ; store blank chr x 125
+        dey
+        bne @clean_loop        
+               
+        lda #<messages          ; point to messages
+        sta $0
+        lda #>messages
+        sta $1
+       
+        clc     
+        lda $0
+        adc $474                
+        sta $0                  ; add y index
+
+        clc
+        lda $1
+        adc $476                ; add pages               
+        sta $1 
+
+        lda $0
+        sta $441                ; store pointers to $441 and $442 / used in unzip
+        lda $1 
+        sta $442
+
+        dec $442                ; dec MSB because unzip will inc on first contact
+
+        dey                     ; let y = 255
+       
+        lda #$e2                ; store message-area pointers in $45c and $45d / used in print room
+        sta $45c
+        lda #$3d
+        sta $45d
+
+        lda #1
+        sta $443                ; set title_flag ( prevents titles in unzip routine )
+     
+        jsr unzip               ; unzip message and save to message area
+
+        ldx #0
+        ldy #0
+
+        sty $495                ; reset inc_printing screen counter
+
+        lda #$e2                ; point to message area
+        sta $0
+        lda #$3d
+        sta $1
+
+@loop
+       
+        lda ($0),y              ; get message from saved area
+        cmp #96                 
+        beq @end                ; if end marker reached then end
+
+        sta $8370,x             ; print message to screen
+
+@inc_printing
+        
+        inc $495                ; screen counter ( message not to exceed > 24 columns )
+        lda $495
+        cmp #24                 ; reached 24th column ?
+        bne @next               ; no
+
+        lda #0                  ; yes
+        sta $495                ; reset screen counter
+        
+        jsr screenup            ; scroll message up one line
+        ldx #255                ; zero x
+@next      
+        inx        
+        iny
+        cpy #125                
+        bne @loop               ; if maximum message reached then end              
+@end
+        rts                     ; end
+
+
+;*******************************************************************************
+;  S C R E E N   U P                   Scrolls user input screen up by 1 line                                                           
+;******************************************************************************* 
+
+screenup 
+
+        pha             ; store A, X, Y
+        txa
+        pha
+        tya
+        pha
+
+        ldx #0     
+        ldy $473        ; 1st byte of room description
+
+scroll_up
+        cpy #9
+        beq @jmp9
+        cpy #8
+        beq @jmp8
+        cpy #7
+        beq @jmp7
+        cpy #6
+        beq @jmp6
+        cpy #5
+        beq @jmp5
+        cpy #4
+        beq @jmp4 
+        cpy #3
+        beq @jmp3
+
+@jmp2
+        lda $80f0,x
+        sta $80c8,x
+@jmp3
+        lda $8118,x
+        sta $80f0,x
+@jmp4
+        lda $8140,x
+        sta $8118,x
+@jmp5
+        lda $8168,x
+        sta $8140,x
+@jmp6
+        lda $8190,x
+        sta $8168,x
+@jmp7
+        lda $81b8,x
+        sta $8190,x
+@jmp8        
+        lda $81e0,x
+        sta $81b8,x
+@jmp9        
+        lda $8208,x
+        sta $81e0,x
+
+        lda $8230,x
+        sta $8208,x            
+                        
+        lda $8258,x  
+        sta $8230,x
+                           
+        lda $8280,x                  
+        sta $8258,x                   
+
+        lda $82a8,x                  
+        sta $8280,x
+
+        lda $82d0,x
+        sta $82a8,x
+
+        lda $82f8,x
+        sta $82d0,x
+
+        lda $8320,x
+        sta $82f8,x
+
+        lda $8348,x
+        sta $8320,x 
+
+        lda $8370,x
+        sta $8348,x 
+
+        lda $8398,x
+        sta $8370,x
+
+        lda #32                 ; clear the bottom line
+        sta $8398,x
+
+        inx
+        cpx #user_screen_width$ ; end of screen yet ?
+        bne @up
+
+        pla                     ; restore Y ,X, A                    
+        tay
+        pla
+        tax
+        pla
+        rts
+
+@up
+        jmp scroll_up
+
+
+;*******************************************************************************
+;  D E T E C T   O B J E C T S                                                             
+;******************************************************************************* 
+
+detect       
+                                ; detects objects at players location ( room )
+                                ; there will be areas within each room
+                                ; this routine tries to match objects and players area within
+                                ; delete any object that might still be appearing top right of screen
+
+@check_area
+
+        lda $48c                ; if current area locked
+        cmp #1
+        beq @not_found          ; then end search for objects
+
+                                ; else continue
+
+        lda $496
+        cmp #1
+        beq @start
+
+        lda #32                 
+        ldx #39
+@loop1
+        sta $8000,x             ; clear object from top of screen
+        dex
+        cpx #27
+        bne @loop1
+
+@start
+        lda #0
+        sta $47f                ; reset object number  ( identifies object in object data table )
+
+        ldx #255     
+@loop2
+        inx                     
+        lda object_location,x
+        cmp #$ff                ; end of object list ?
+        beq @not_found          ; yes
+        cmp $45a                ; no, but does it equal players current room LSB location ?
+        bne @loop2              ; no
+
+@object_found                   ; there is an object here
+
+        lda object_area,x       ; now check if object is in same "area" of the room as the player
+        cmp $438                ; tab counter holds players area value within a room
+        bne @loop2              ; no match
+       
+        stx $47f                ; match found with data table /store object number ie ( byte 1,  65,80,80,76,69, 255   APPLE )
+                                ;                                                            ^   ^            ^    ^
+                                ;                                                        obj num -  descript -  end marker
+        ldx #255
+@loop3
+        inx
+        lda objects,x           ; find object that matches object number
+        cmp $47f               
+        bne @loop3              ; not found
+        
+        ldy #28                 ; found / set column position on screen for printing
+
+@print_object
+
+        inx
+        lda objects,x           ; print object name left to right >
+        cmp #255                ; found object number ? ( denotes end of name and don't print number )
+        beq @done               ; yes
+        sec
+        sbc #64                 ; convert to lowercase + -2 disguise
+        pha
+
+        lda $496
+        cmp #1
+        bne @on_screen
+        pla
+        sta $3c00,y
+        iny
+        jmp @print_object
+
+@on_screen
+        pla
+        sta $8000,y             ; print object name to screen
+        iny
+        jmp @print_object       ; keep printing until object number found
+@done
+        rts
+
+@not_found
+        lda #$ff
+        sta $47f                ; let $47f = $ff / this will tell the get routine to drop 
+        rts
+
+
+
+
+;*******************************************************************************
+; I N V E N T O R Y                                                               
+;*******************************************************************************
+
+inventory 
+
+        
+
+        lda #0
+        sta $482                ; reset screen formatting
+                                ; and clear the inventory window
+
+        ldx #13   
+        lda #32                 ; blank     
+@loop        
+        sta $8312,x             ; erase 5 lines ( 5 lines = 5 maximum objects )
+        sta $833a,x
+        sta $8362,x
+        sta $838a,x
+        sta $83b2,x
+        dex
+        bne @loop 
+        
+        ldx #0
+     
+
+@inventory_room                 ; now search all possible objects in inventory room using just the LSB of absolute room address
+                                ; as a consequence, the program must be careful not to have two rooms of the same LSB value.
+
+        ldy #255
+@loop1    
+        iny
+        
+        lda object_location,y   ; is the object inside the
+        cmp #1                  ; inventory room ?
+        beq @start              ; yes, then get object
+        cmp #$ff                ; end of search ?
+        beq @done               ; yes
+        jmp @loop1              ; no
+
+@start        
+        sty $480                ; store object number
+        tya
+        pha                     ; and push object number in order to later continue the search for more objects in the inventory room
+        
+       
+        
+        ldy $482                ; screen formatting ( new line for each object )   
+        ldx #255
+      
+        
+@loop2
+        inx
+        lda objects,x           ; search objects
+        cmp $480                ; looking for an object number match in data
+        bne @loop2              ; keep looking
+        
+@loop3                          ; found object number
+        inx 
+        lda objects,x           ; load object bytes
+        cmp #255                ; until end marker
+        beq @next
+        sec
+        sbc #64                 ; convert to lowercase
+        sta $8313,y             ; print to screen 
+        iny
+        jmp @loop3   
+
+@next
+        lda $482
+        clc
+        adc #40                 ; add new a line
+        sta $482                ; store new line
+   
+        pla                     ; restore x & y
+        tay
+     
+        jmp @loop1              ; get next object
+@done
+       
+        rts                     ; done
+
+
+;*******************************************************************************
+; T A B   I N V E N T
+;*******************************************************************************
+tab_invent    
+                                ; each time shift space is pressed, the next object in the inventory is highlighted
+
+        lda $468                ; objects held by player
+        cmp #0                  ; are they holding at least one object to contine ?
+        bne @test               ; yes
+        rts                     ; no, goodnight
+
+@test
+        jsr inventory           ; refresh inventory
+
+        ldx #0
+
+        lda $484                ; tab
+@two    cmp #2
+        bne @three
+        ldx #40
+@three  cmp #3
+        bne @four
+        ldx #80
+@four   cmp #4
+        bne @five
+        ldx #120
+        jmp @start
+@five   cmp #5
+        bne @start
+        ldx #160
+              
+@start       
+        ldy #0
+@loop2    
+        clc
+        lda $8313,x             ; purpose here is to read selected objects on screen ( inventory ) byte by byte
+        adc #128                ; inverting as it goes
+        sta $8313,x             ; so as to highlight the selected object
+        inx
+        iny
+        cpy #11
+        bne @loop2              ; yes      
+@done       
+        rts
+        
+
+;*******************************************************************************
+;   C L E A R   S C R E E N                                                            
+;******************************************************************************* 
+       
+clear_screen                            ; clears entire screen
+
+        lda #32
+        ldx #0
+@loop
+        sta $8000,x
+        sta $80c8,x
+        sta $8190,x
+        sta $8258,x
+        sta $8320,x
+        inx
+        cpx #201
+        bne @loop
+        rts
+
+;*******************************************************************************
+;  M O V E   I N P U T                                                         
+;******************************************************************************* 
+
+move_input                      ; all unrecognized commands come here and
+                                ; reprinted with a question mark 
+
+        ;jsr screenup
+
+        ldx #255
+@loop
+        inx
+        lda $83c1,x             ; get input string
+        cmp #64
+        bcc @print              ; if lowercase then print
+        sec
+        sbc #64                 ; else convert to lowercase
+@print
+        sta $8370,x 
+        cpx $411                ; if x = len$ ( player command ) then print question_mark
+        bne @loop        
+
+@question_mark
+
+        inx                     ; move right 2
+        inx
+        lda #63                 ; question mark symbol
+        sta $8370,x             ; print it
+@con
+        jsr screenup
+        rts
+
+;*******************************************************************************
+;  C L E A R   I N P U T
+;******************************************************************************* 
+
+clear_input             ; clears the users input on screen text
+        ldx #40
+        lda #32
+@del1   dex
+        sta $83c1,x
+        bne @del1
+        rts
+
+clear_text
+        ldx #26
+        lda #32
+@del2   
+        dex
+        sta $8398,x
+        sta $8370,x
+        bne @del2
+        stx $c6
+        rts
+
+;*******************************************************************************
+;  K E Y B O A R D                                                
+;******************************************************************************* 
+
+keyboard        
+
+        jsr clear_input         ; tidy user text  
+                       
+        lda #0
+        sta $411                ; reset buffer length ( used in IRQ cursor )
+        
+        lda #19                 ; home the cursor
+        jsr $ffd2 
+
+        jsr IRQ_cursor   
+        jsr $ffcf               ; get user input
+        jsr IRQ_norm
+       
+        jsr clear_text          ; tidy text
+        
+        jmp string_interpreter
+        
+;*******************************************************************************
+;  S C R O L L   T E X T    N O R T H                                                          
+;******************************************************************************* 
+
+scroll_text_north        
+        
+        ldy #3                          ; bytes #3 and #4 of room description holds direction data for north
+        jsr check_direction_possible    ; add these bytes together
+                                        ; if bytes > 0 then a room exists to the north, scroll_text_north_sub
+ 
+        cmp #0                          ; if bytes = 0 then no room exists in that direction
+        bne scroll_text_north_sub
+        
+        ldy #9
+        jsr print_message
+        jmp done_west     
+
+scroll_text_north_sub             
+
+        jsr print_room                  ; read room description into memory        
+        jsr int_direction_all           ; set scrolling varibles 
+        jsr int_north                   ; "
+        jsr print_room_layout
+        jsr scroll_clear_north          ; scroll text onto screen
+        jsr highlighter                 ; highlight the first area
+
+done_north
+        jmp keyboard
+
+;*******************************************************************************
+;  S C R O L L   T E X T   S O U T H                                                          
+;******************************************************************************* 
+           
+scroll_text_south
+       
+        ldy #5                          ; bytes #5 and #6 of room description holds south data
+        jsr check_direction_possible    
+
+        cmp #0                       
+        bne scroll_text_south_sub
+        
+        ldy #9
+        jsr print_message
+        jmp done_west                
+        
+scroll_text_south_sub               
+    
+        jsr print_room        
+        jsr int_direction_all        
+        jsr int_south             
+        jsr print_room_layout
+        jsr scroll_clear_south
+        jsr highlighter
+   
+done_south      
+        jmp keyboard
+     
+;*******************************************************************************
+;  S C R O L L   T E X T   E A S T                                                           
+;******************************************************************************* 
+           
+scroll_text_east
+          
+        
+        ldy #7                          ; bytes #7 and #8 of room description holds east data                       
+        jsr check_direction_possible    
+
+        cmp #0                 
+        bne scroll_text_east_sub
+        
+        ldy #9
+        jsr print_message
+        jmp done_west                  
+        
+scroll_text_east_sub            
+       
+        jsr print_room
+        jsr int_direction_all       
+        jsr int_east         
+         
+        jsr print_room_layout
+        jsr scroll_clear_east_start
+        jsr highlighter        
+     
+done_east
+        jmp keyboard
+      
+;*******************************************************************************
+;  S C R O L L   T E X T   W E S T                                                          
+;*******************************************************************************  
+           
+scroll_text_west      
+        
+        ldy #9                          ; bytes #9 and #10 of room description holds west data                         
+        jsr check_direction_possible 
+
+        cmp #0                       
+        bne scroll_text_west_sub
+        
+        ldy #9
+        jsr print_message
+        jmp done_west              
+    
+scroll_text_west_sub                       
+       
+        jsr print_room                       
+        jsr int_direction_all          
+        jsr int_west               
+        jsr print_room_layout
+        jsr scroll_clear_west        
+        jsr highlighter  
+
+done_west 
+        jmp keyboard
+
+
+;*******************************************************************************
+;  C H E C K   D I R E C T I O N   P O S S I B L E                                                             
+;******************************************************************************* 
+
+check_direction_possible
+
+                        ; bytes 3 - 10 in every room holds the low and high byte addresses of adjoining rooms                        
+                        ; this routine reads the LSB and MSB of that room.
+
+        lda $45a        ; absolute room pointers ( absolute, because they are not to be manipulated in loops )
+        sta $0
+        lda $45b                      
+        sta $1
+                        ; reads current room data to get starting address of next room, both LSB and MSB
+        lda ($0),y      ; y is given by the scroll_text routines above and will be either 3,5,7 or 9 depending on whether 
+                        ; north, south, east or west were chosen
+        sta $447        ; store LSB of next room address
+
+        iny    
+
+        lda ($0),y      ; get MSB of next room address
+     
+        clc
+        adc $447        ; add them both togther
+        cmp #0          ; if next room address = 0 
+        beq @done       ; then no room exists in that direction
+
+        pha             ; else, push result
+        dey
+
+        lda ($0),y      ; and update absolute room pointers to the new room address
+        sta $45a        ; store LSB      
+
+        iny   
+
+        lda ($0),y     
+        sta $45b        ; store MSB
+
+                        ; one more thing to do, find the initial entry point of this new room ( area within the room )
+
+        lda #128        ; load $47a with highest bit #128
+                        ; $47a is only used locally here and nowhere else - $47a gets halved on each loop cycle until it equals
+                        ; the data held in the new room description layout ( byte 2 of room description )
+
+                        ; The objective here is to load the x value into $438 ( room area ) so that the player is standing in the correct
+                        ; area of the new room ( room descriptions byte 2 )
+        sta $47a
+
+        ldy #2          ; get player position from room description layout data ( byte 2 )
+        ldx #0  
+@loop
+    
+        lda ($0),y      ; load player position
+        cmp $47a        ; does position equal value held in $47a ^^ ?
+        beq @found      ; yes, match found
+        lda $47a        ; no
+        lsr             ; half the value in $47a
+        sta $47a        ; and store it
+        inx
+        jmp @loop
+@found       
+        stx $438        ; store counter / initial entry point of room           
+        pla             ; restore room result from earlier    
+@done 
+     
+        rts             ; back we go
+          
+
+;*******************************************************************************
+;  S C R O L L   C L E A R   N O R T H                                                           
+;******************************************************************************* 
+
+scroll_clear_north
+        
+        ldy #0
+        
+scroll_clear_north_sub
+
+        ldx #0
+        
+scroll_loop_north 
+
+
+        lda $8190,x
+        sta $81b8,x
+
+        lda $8168,x
+        sta $8190,x
+
+        lda $8140,x
+        sta $8168,x
+        
+        lda $8118,x
+        sta $8140,x
+        
+        lda $80f0,x
+        sta $8118,x     
+        
+        lda $80c8,x
+        sta $80f0,x
+        
+        lda $80a0,x
+        sta $80c8,x
+        
+        lda $8078,x
+        sta $80a0,x
+        
+        lda $8050,x
+        sta $8078,x
+        
+        lda $8028,x
+        sta $8050,x
+        
+        lda $8000,x
+        sta $8028,x    
+       
+       
+        inx
+        cpx #40
+        bne scroll_loop_north
+              
+        inc $46a
+        
+        lda $46a
+        
+        cmp #06
+        bcs text_display_north
+        jsr blank_topline
+        
+        
+scroll_end_north
+
+        jsr text_delay
+        
+        lda $46a
+        cmp #17      
+        bne scroll_clear_north_sub
+        rts
+        
+
+blank_topline
+
+        lda #32
+        jsr blank_line
+        jmp scroll_end_north
+        
+blank_line
+
+        ldx #0   
+@loop
+        sta $8000,x
+        inx
+        cpx #40
+        bne @loop
+        rts
+
+text_display_north
+      
+        ldy $46c
+        cpy #0
+        beq textblock_north_2
+        
+               
+textblock_north_1
+
+        lda #$f0
+        sta $0
+        lda #$3c
+        sta $1
+
+        ldx #40
+@loop       
+        dex
+        dey
+
+        lda ($0),y
+        sta $8000,x 
+       
+        cpx #0
+        bne @loop
+        sty $46c
+        jmp scroll_end_north
+                
+textblock_north_2
+
+        ldy $46b
+        ldx #40
+
+        lda #$00
+        sta $0
+        lda #$3c
+        sta $1
+@loop
+        dex
+        dey
+
+        lda ($0),y
+        sta $8000,x
+      
+        cpx #0
+        bne @loop
+        sty $46b  
+        jmp scroll_end_north
+        
+;*******************************************************************************
+;  S C R O L L   C L E A R   S O U T H                                                         
+;*******************************************************************************
+
+scroll_clear_south
+
+        ldy #0
+        
+scroll_clear_south_sub
+        
+        ldx #0
+        
+scroll_loop_south
+        
+        lda $8028,x                                     
+        sta $8000,x     
+        
+        lda $8050,x
+        sta $8028,x
+        
+        lda $8078,x
+        sta $8050,x
+        
+        lda $80a0,x
+        sta $8078,x
+        
+        lda $80c8,x
+        sta $80a0,x
+        
+        lda $80f0,x
+        sta $80c8,x
+        
+        lda $8118,x
+        sta $80f0,x
+        
+        lda $8140,x
+        sta $8118,x
+        
+        lda $8168,x
+        sta $8140,x
+
+        lda $8190,x
+        sta $8168,x
+
+        lda $8190,x
+        sta $8168,x
+
+        lda $81b8,x
+        sta $8190,x
+   
+        inx
+        cpx #40
+        bne scroll_loop_south
+
+        iny
+        sty $46a
+        
+        cpy #6
+        bcs text_display_south
+        jsr blank_bottomline
+        
+scroll_end_south
+
+        jsr text_delay
+        
+        ldy $46a
+        cpy $46d
+        bne scroll_clear_south_sub
+
+        rts
+              
+blank_bottomline
+
+        ldx #0
+        lda #32
+        
+blank_bottomline_loop
+        
+        sta $81b8,x
+        inx
+        cpx #40
+        bne blank_bottomline_loop
+        rts
+        
+        
+        
+text_display_south
+        
+        ldy $46c
+        cpy #240
+        beq textblock_south_2
+
+        lda #$00
+        sta $0
+        lda #$3c
+        sta $1
+
+        ldx #0   
+@loop
+        lda ($0),y
+        sta $81b8,x        
+        
+        inx
+        iny
+        cpx #40
+        bne @loop
+
+        sty $46c
+        jmp scroll_end_south
+               
+textblock_south_2
+
+        lda #$f0
+        sta $0
+        lda #$3c
+        sta $1
+
+        ldy $46b
+        ldx #0            
+@loop
+        lda ($0),y
+        sta $81b8,x
+        
+        inx
+        iny
+        cpx #40
+        bne @loop
+
+        sty $46b
+        jmp scroll_end_south
+
+;*******************************************************************************
+;  S C R O L L   C L E A R   E A S T                                                          
+;*******************************************************************************
+
+scroll_clear_east_start
+
+scroll_blanks_east                      ; introduces spacing between each room description on screen
+        
+        jsr start_scroll_east           ; scroll top half of screen 1 position to the left
+
+        ldx #0
+@loop1                                  ; then introduce a row of spaces 12 deep far right of screen
+        lda #32
+        sta $8027,x
+        sta $8117,x
+        txa
+        clc
+        adc #40
+        tax
+        cpx #240
+        bne @loop1
+
+        ldy #10                         ; now scroll top half of screen 10 positions to the left
+@loop2
+        dey
+        jsr start_scroll_east
+        bne @loop2
+                                        ; spacing complete
+        ldy #0
+        ldx #0
+
+        jmp scroll_clear_east
+
+scroll_clear_east_top   
+        
+        ldx $470                                       ; this is a compare value which increases from an initial 200 to 240
+        inx
+        stx $470
+
+        ldx #0                                          ; reset y to top and far right of screen
+        
+scroll_clear_east
+
+        
+        lda #$00
+        sta $0
+        lda #$3c
+        sta $1
+
+        lda ($0),y
+        sta $8027,x        
+
+        lda #$f0
+        sta $0
+        lda #$3c
+        sta $1
+
+        lda ($0),y
+        sta $8117,x
+
+        clc
+        lda $46e                                       ; initial value = 200
+        adc #40                                         ; add 40 ( next line )
+        sta $46e                                       ; x increases by 40 each time
+        tax             
+        
+        clc
+        lda $46f                                       ; initial value = 0
+        adc #40
+        sta $46f                                       ; y
+        tay
+        
+        cpy $470
+        bne scroll_clear_east
+        
+        ldy $472
+        cpy #39
+        beq return_from_east
+        
+        jsr start_scroll_east
+        jsr text_delay
+        
+        lda #0
+        sta $46e                                       ; reset to zero
+
+        ldy $472                                       ; initial value = 0
+        iny
+        sty $472
+        sty $46f                                       ; next row of columns
+
+        ldx $471                                       ; initial value = 0
+        inx                                             ; count 40 rows
+        stx $471
+
+        cpx #40                                         ; all 40 rows complete ?
+        bne scroll_clear_east_top
+        
+return_from_east
+
+        rts
+
+start_scroll_east
+        
+        ldx #0
+        
+scroll_east_sub
+
+        
+        lda $8001,x                                     ; lines 1 to 8
+        sta $8000,x
+        
+        lda $8029,x
+        sta $8028,x
+        
+        lda $8051,x
+        sta $8050,x
+        
+        lda $8079,x
+        sta $8078,x
+        
+        lda $80a1,x
+        sta $80a0,x
+        
+        lda $80c9,x
+        sta $80c8,x
+
+        ;***************************************
+        
+        lda $80f1,x
+        sta $80f0,x
+        
+        lda $8119,x
+        sta $8118,x
+
+        lda $8141,x
+        sta $8140,x
+
+        lda $8169,x
+        sta $8168,x
+
+        lda $8191,x
+        sta $8190,x
+
+        lda $81b9,x
+        sta $81b8,x
+           
+        inx
+        cpx #39
+        bne scroll_east_sub
+
+        rts
+
+;*******************************************************************************
+;  S C R O L L   C L E A R   W E S T                                                      
+;*******************************************************************************
+              
+scroll_clear_west                       
+
+; scrolls screen left to right, sliding the current room description off the screen while introducing the next one
+                
+; before scrolling, spacing is introduced between the current room and the next one
+
+        
+        jsr start_scroll_west           ; scroll screen 1 position to the right
+                                        
+@loop1                                  
+        lda #32                         ; now insert 1 column of spaces 12 deep far left edge of screen
+        sta $8000,x                     ; block 1
+        sta $80f0,x                     ; block 2
+        txa
+        clc
+        adc #40                         ; next row
+        tax
+        cpx #240                        ; done 6 loops ?   ( 6 x 2 blocks = 12 rows )
+        bne @loop1                      ; no
+
+                                        ; yes
+        ldy #10                         ; now scroll top half of screen 10 positions to the right
+@loop2
+        dey
+        jsr start_scroll_west
+        bne @loop2                      ; no, keep scrolling
+
+                                        ; yes, spacing is complete
+
+;-------------------------------------------------------------------------------
+
+scroll_clear_west_sub                   ; next, continue to scroll screen right while introducing the next room description
+                                        ; split here into 2 x blocks of 200 bytes ( 12 rows )
+
+
+;--------------------------------------------------
+        ldx #0
+        ldy #39                         ; initial values
+        sty $46f                      
+;                                         the two block routines below print 12 bytes of the next room description
+;                                         each byte is printed one at a time on rows 0 to 11 far left edge of screen
+
+;                                         the scroll routine then slides them all right 1 column 
+;                                         before introducing the next 12 bytes starting on row 0
+;                                         this repeats until the screen ( 40 columns ) is filled with the new room description  
+;---------------------------------------------------
+@loop
+        lda #$00                        ; block 1   ( rows 0 - 5 )
+        sta $0
+        lda #$3c                        ; Y indirect points to $3c00  ( beginning of room description )
+        sta $1
+        lda ($0),y                      ; load it
+        sta $8000,x                     ; print it    $8000 = row 0 column 0 ( top left of screen )
+;---------------------------------------------------
+
+        lda #$f0                        ; block 2   ( rows 6 - 11 )
+        sta $0
+        lda #$3c                        ; Y indirect points to $3cc8  ( $3cf0 is $3c00 + 240 or row 6 in room description )
+        sta $1
+        lda ($0),y                      ; load it
+        sta $80f0,x                     ; print it    $80f0 = row 6 column 0 on screen
+;---------------------------------------------------
+        clc
+        txa
+        adc #40                         ; next row ( adding 40 columns adds 1 row )
+        tax
+
+        clc
+        tya
+        adc #40                         ; next row of Y ( room description )
+        tay       
+
+        cpx #240                        ; end of rows ?
+        bne @loop                       ; no
+
+        dec $46f                        ; yes,  select next column of room description / $46f is Y 
+;                                         DEC - because scroll is moving left to right ( room description is scrolled onto screen backwards )
+
+        lda $46f                        ; check if all columns are printed
+        cmp #255                        ; has $46f decremented to 255 ?  ( Y never reaches 255, only 0 )
+        bne @scroll                     ; no
+        
+
+        
+       
+
+        rts                             ; yes, routine done, goodbye
+
+@scroll
+        jsr start_scroll_west           ; shift screen right 1 column
+        jsr text_delay
+
+        ldy $46f                        ; load Y with next column
+        ldx #0                          ; restart rows
+
+        jmp @loop                       ; and repeat
+                                                                        
+start_scroll_west   
+        
+        ldx #39          
+@loop        
+        dex
+
+        lda $8000,x                     ; rows 0 to 11 
+        sta $8001,x        
+        lda $8028,x
+        sta $8029,x        
+        lda $8050,x
+        sta $8051,x        
+        lda $8078,x
+        sta $8079,x        
+        lda $80a0,x
+        sta $80a1,x        
+        lda $80c8,x
+        sta $80c9,x        
+        lda $80f0,x
+        sta $80f1,x        
+        lda $8118,x
+        sta $8119,x
+        lda $8140,x
+        sta $8141,x
+        lda $8168,x
+        sta $8169,x
+        lda $8190,x
+        sta $8191,x
+        lda $81b8,x
+        sta $81b9,x    
+               
+        cpx #0
+        bne @loop
+        rts
+
+
+;*******************************************************************************
+;  T E X T   D E L A Y                                                              
+;******************************************************************************* 
+        
+text_delay              ; affects speed of room text scrolling
+
+        txa
+        pha             ; preserve X & Y
+        tya
+        pha
+
+        ldx #0
+        ldy #2          ; speed east, west
+
+        lda $467        ; which direction was chosen ? ( value set at beginning of string interp )
+@east
+        cmp #5          ; e ( east )        
+        bne @other
+        jmp @loop
+@other
+        cmp #23         ; w ( west )
+        bne @north_south
+        jmp @loop
+
+@north_south
+
+        ldy #9          ; speed north, south
+
+@loop
+        dex
+        bne @loop 
+        ldx #0
+        dey
+        bne @loop           
+
+        pla
+        tay
+        pla             ; restore X & Y
+        tax
+        rts
+
+
+;******************************************************************************************************************************
+;* S T R I N G   I N T E R P R E T E R 
+;******************************************************************************************************************************
+ 
+string_interpreter              ; interpret string given by player 
+                                ; start by finding the given command and matching it with the data table
+
+        
+        ldx #255
+
+        lda $411                ; load string length ( taken from IRQ cursor position )        
+        cmp #0                  ; if length = 0 then get object              
+        bne @start              ; else start
+        jmp get
+                                 
+@start
+
+        lda $83c1               ; get first byte
+        sta $467                ; which direction was chosen ( used in text delay )
+                            
+@loop                           ; find length of command given by player ( in bytes )                           
+        inx
+        lda $83c1,x             ; working left to right, find the first space ( a space denotes end of command ) 
+        cmp #32                 ; if a = space then question_mark             
+        bne @loop               ; else loop              
+        
+question_mark
+
+        cpx #buffer_length$-1
+        bcc check_command       
+        jmp keyboard            
+ 
+check_command                   ; yes either the max string length was reached or a space was found      
+         
+        stx $412                ; store command length here  
+
+        cpx #1                  ; is this a single byte command? ( first byte command is #0  / #1 is space )
+        bne multi_command_check ; no
+
+
+;*******************************************************************************                               
+;  S I N G L E   C O M M A N D
+;*******************************************************************************
+
+single_command                  ; yes
+       
+        ldx #0
+        stx $434                ; reset table pointer
+        dex
+@loop
+        inx        
+        lda single_commands,x   ; load next command in table  
+        cmp #$ff                ; if list exhausted then question mark
+        beq question_mark
+
+        cmp $83c1               ; if player command matches data then found_command
+        beq found_command      
+        inc $434                ; track progress through command table by inc $434 index
+        jmp @loop            
+
+
+;*******************************************************************************
+; F O U N D   C O M M A N D    ( look up table ) using the stack to jump
+;*******************************************************************************
+
+found_command                   ; looks up addresses on the jump table using the index stored in $434                                
+
+        lda $434                ; table pointer
+        asl                     ; double its value here because this routine pulls not one but two values off the table, so needs to skip 2
+        tax                     ; MSB & LSB      
+
+        lda table+1,x           ; load MSB of table,x and push onto stack
+        pha
+        lda table,x             ; load LSB of table,x and push onto stack
+        pha
+
+        php                     ; push the processor flags too
+        rti                     ; and finally RTI pulls the two combined values off the stack to form a jump address
+
+
+;*******************************************************************************
+; M U L T I   B Y T E   C O M M A N D   C H E C K                                                                
+;*******************************************************************************
+
+multi_command_check
+                                        ; $412 holds length of command
+
+                                        ; now find length of second command / word and store its length @ $413  
+
+        lda #0
+        sta $413                        ; reset
+     
+        clc
+        ldx $411                        ; working backwards looking for a space
+@loop1   
+
+        lda $83c1,x                     ; read the next byte in string 
+        cmp #32                         ; if a = space then done  
+        beq @done
+ 
+        inc $413                        ; store word len
+        dex
+        bne @loop1                      ; keep looking
+@done        
+        
+        lda $413
+        cmp #0                          ; is there a word ?
+        beq string_interpreter_2        ; no  
+       
+        lda #1                          ; yes, set the double word flag
+        sta $431
+ 
+
+;*******************************************************************************
+; S T R I N G   I N T ER P R E T E R  2
+;*******************************************************************************
+
+string_interpreter_2            ; entry point for double commands such as GO / Y is determined in those routines
+                                ; otherwise the default is zero    
+
+        ldy #0  
+        sty $42f                ; double command, eg: go north / initially set to #0
+       
+        lda #255              
+        sta $434                ; reset table pointer
+        tax
+                                ; now match players given command with data table
+@loop 
+        inx
+        lda commands,x          ; does it match anything on the data table ?
+
+        cmp #$ff
+        beq @exit
+
+        cmp $83c1,y
+        bne @loop               ; no 
+
+        iny                     ; yes / INY to check next byte           
+
+        cpy $412                ; does Y = players command length ?
+        bne @loop               ; no
+        jmp @calc               ; yes
+
+@not_found 
+             
+        inx                     ; no
+        ldy $42f                ; start over / zero the Y register and keep looking for a match                              
+        jmp @loop       
+                                                       
+@calc
+      
+        dex                     ; dex because commands,x has hit an unwanted zero terminator
+        ldy #0  
+      
+@calc_loop       
+        lda commands,x          ; work backwards
+        dex                     ; searching for zero
+        iny                     ; use Y for counter
+        cmp #0                  ; found it ?
+        bne @calc_loop          ; no
+        
+@find_zero                      ; yes / -1 after hitting zero        
+        dey     
+        cpy $412                ; does Y = command length ?
+        bne @exit               ; no                
+        jmp found_command       ; yes, match it with command table
+
+@exit
+        jsr move_input          ; unknown word, set question mark 
+        jmp keyboard
+         
+
+;*******************************************************************************
+; G E T                                                                
+;*******************************************************************************
+        
+get        
+        ldy $47f                ; object detected / object number / comes from detect routine
+        cpy #$ff                ; if object detected < $ff ( $ff is given by the detect routine if no object was found or area was locked )
+        bne @con                ; then contine with get 
+        jmp drop                ; else drop something instead
+@con
+        lda #0
+        sta $491                ; flag used to determin if drop or get was selected / effects check_drop
+
+        sty $48d                ; store object number
+
+@get_con   
+
+        lda $468                ; check players carry limit
+        cmp #carry_limit$       ; if objects held by player < limit
+        bne @get_object         ; then get object
+        
+        ldy #0                  ; index start of message
+        lda #0                  ; page number of message
+        jsr print_message
+        jmp keyboard
+
+@get_object
+ 
+        lda #1
+        sta object_location,y   ; place LSB of object_location into the inventory room / y = index of object_location
+        
+        inc $468                ; increase objects held by player by 1
+
+        lda $468                ; if objects held = 1
+        cmp #1                  ; then let tab = 1
+        bne @next               ; else next
+
+        lda #1
+        sta $484                ; let tab = 1
+@next  
+        jsr detect              ; update object top right screen    
+        jsr tab_invent          ; refresh inventory and invent highlight
+        jsr check_drop          ; and check if taking the object locks current area
+@done
+        jmp keyboard
+       
+;*******************************************************************************
+; D R O P                                                             
+;*******************************************************************************
+
+drop    
+                                ; this routine finds the selected object and drops it into the current room and area
+                                ; if however, the area with the room is locked then no object is droppped
+
+                                ; this routine will first identify the object to be dropped by obtaining its object number
+                                ; then it will check if the object dropped unlocks an area, eg a key dropped opens a locked door
+                                ; if not then a further  if area is locked and if so then end the routine without dropping
+
+        lda #1
+        sta $491                ; flag used to determin if drop or get is selected
+drop2
+        lda $468                ; if objects held by player = 0 then nothing to drop, end routine
+        cmp #0                  
+        bne @start              ; else start
+        jmp keyboard            
+
+@start
+        ldx #0
+@loop
+        lda $8313,x             ; search screen ( inventory ) for a byte > 127 ( a highlighted character )
+        cmp #127              
+        bcs @next_step          ; if found then goto next_step
+
+        txa                     ; else let x = x + 40 ( check next line ) loop checks a maximum of just 5 bytes ( 5 objects )
+        clc
+        adc #40                 
+        tax              
+        jmp @loop  
+        
+@next_step           
+        stx $48a                ; start by saving the screen position where the hightlighted byte was found 
+@find_length                    ; next, find the length of object in bytes
+        ldy #0
+@len_loop
+        lda $8313,x             ; find end of object name
+        inx                     
+        cmp #160                ; check for end of object name ( inverted space detected )
+        bne @len_loop           ; not detected / loop back
+
+                                ; found end of object name
+
+        dex                     ; exclude inverted space
+        stx $48b                ; store length of object
+
+        ldy #255                ; zero y
+@reset
+        ldx $48a                ; reload the x saved screen position
+@find       
+        iny
+@offset
+        lda $8313,x             ; search each byte left to right until a complete match is found       
+        sec
+        sbc #64                 ; reduce each reversed ( highlight ) byte to match the object byte held data        
+        cmp objects,y           ; if a match is found then check the next byte until the end marker is reached
+        bne @reset              ; else reset x to the start of saved position ( back to beginning of highlighted object )  
+        inx                     ; a byte match was found / although this does not mean this byte belongs to the object
+        cpx $48b                ; only when all bytes match ( x = length of object ( $48b )) then check end of data
+        bne @find               ; else keep looking
+
+@check_end_of_data 
+        iny
+        lda objects,y           ; now test for end of object data
+        cmp #255                ; which is denoted by #255 in data
+        beq @calc               ; the test was positive goto calc
+        jmp @offset             ; the test was negative goto offset
+
+@calc                           ; the correct object is now identified, now find its corrosponding object number by working backwards byte by byte
+                                ; all object numbers are < 65 
+        dey                     ; dey y to avoid #255 end marker            
+
+        lda objects,y           ; if object byte
+        cmp #64                 ; < 65 then goto object_number
+        bcs @calc               ; else keep searching
+
+@object_number
+
+        sta $48d                ; ** object number ** 
+    
+        jsr check_drop          ; check if object unlocks current area if dropped   
+        jsr check_locks         ; if area is locked then
+
+        lda $48e                ; let flag = 1
+        cmp #1  
+        beq @next2              ; if flag = 1 then end this routine preventing the object being dropped
+
+@con                            ; else continue  
+
+
+        ldy $48d                ; store object number to y
+                            
+        lda $45a                ; get LSB of room address
+        sta object_location,y   ; store current room number in object location data      
+
+        lda $438                ; but also store the 'area' within the room the object was dropped  ( area can have a value of 0 - 7 )
+        sta object_area,y       
+        dec $468                ; decrease number of objects held by player by #1
+        lda $468
+        cmp #0                  ; if objects held = 0 then update inventory  ( ensures that the last object is taken off the screen )
+        bne @next1              ; else skip it
+        jsr inventory
+@next1
+        lda $484                ; if inventory tab = 1 then goto next2
+        cmp #1                  
+        beq @next2
+        dec $484                ; else let tab = tab - 1  ( prevents a highlighted tab with no object in it ) 
+@next2      
+        jsr detect              ; update top right screen with dropped object
+        jsr tab_invent          ; update the inventory and the inventory tab position   
+        lda #0
+        sta $493
+        jmp keyboard            ; done
+
+;*******************************************************************************
+;  C H E C K   L O C K S                                                            
+;******************************************************************************* 
+check_locks
+                                ; a routine that tests if player is in a locked area
+                                ; and if true sets a flag to prevent objects being taken or dropped
+
+        lda #0
+        sta $48e                ; flag
+
+        ldx #255
+@loop
+        inx
+        lda locked_area_bits,x  ; if data = current players room
+        cmp #$ff                ; if end of data reached then return
+        beq @done               ; else loop back
+        cmp $45a                ; ( room )
+        bne @loop               ; then check area
+        
+@area
+        inx
+        lda locked_area_bits,x  ; if data = current players area then set flag 
+        cmp #$ff
+        beq @done
+        cmp $438                ; ( area )
+        bne @loop             
+        
+        lda #1                  ; set flag
+        sta $48e
+@done
+        rts
+
+;*******************************************************************************
+;  C H E C K   D R O P
+;*******************************************************************************
+check_drop
+ 
+        ldx #255
+@loop1
+        inx
+        lda drop_check,x        ; look for object number
+        cmp #$ff
+        beq @done               ; if end of data then end routine
+        cmp $48d                ; if object number is found then goto next
+        bne @loop1              ; else loop
+@next
+        inx                     ; is object in same room ?
+        lda drop_check,x        ; 
+        cmp #$ff
+        beq @done
+        cmp $45a                
+        bne @loop1              ; no, loop back
+
+        inx                     ; yes
+        lda drop_check,x 
+        cmp #$ff
+        beq @done
+        cmp $438                ; is object in same area ?
+        bne @loop1              ; no, loop back
+            
+        ldx #255                ; yes, zero x
+      
+                                ; ** object is here **
+
+                                ; does object have the ability to lock or unlock at this location ?
+@loop2       
+        inx               
+        lda locked_area_bits,x 
+        cmp #$ff                ; if end of data then end routine
+        beq @done              
+        cmp $45a                ; if room matched with data then flag
+        bne @loop2              ; no
+
+@flag
+        lda $491                ; *** if dropping an object then unlock ***   ( $491 is set at top of get and drop routines )
+        cmp #0          
+        bne @unlock             ; *** if taking an object then lock ***
+
+@lock
+        inx                     
+        lda locked_area_bits,x  ; yes
+        cmp #$ff
+        beq @done
+        sec
+        sbc #8                  ; subtract 8 because 8 was added when area was unlocked
+        cmp $438                ; object in same area as player ?
+        bne @loop2              ; no, loop back
+        jmp @lock_area          ; yes
+
+@unlock
+        inx                     
+        lda locked_area_bits,x  ; yes
+        cmp #$ff
+        beq @done
+        cmp $438                ; same area ?
+        bne @loop2              ; no
+        jmp @unlock_area
+
+@lock_area
+
+        sec                     ; this next section ensures that if required, the area can be locked again by subtracting a constant value
+                                ; the value 8 is used as its garanuteed is be out of range in the 8 bit layout
+
+        lda locked_areas,x      ; let area = area - 8
+        sbc #8        
+        sta locked_areas,x    
+
+        lda locked_area_bits,x  ; let area_bits = area_bits - 8
+        sbc #8
+        sta locked_area_bits,x
+
+        lda #0
+        sta $48f                ; restore flag used in tab room
+
+        jsr print_room_layout   ; instantly update the result to screen
+@done
+        rts
+
+@unlock_area
+
+        
+        
+
+        clc                     ; this next section ensures that if required, the area can be locked again by subtracting a constant value
+                                ; the value 8 is used as its garanuteed is be out of range in the 8 bit layout
+
+        lda locked_areas,x      ; let area = area + 8
+        adc #8        
+        sta locked_areas,x    
+
+        lda locked_area_bits,x  ; let area_bits = area_bits + 8
+        adc #8
+        sta locked_area_bits,x
+
+        lda #0
+        sta $48f                ; restore flag used in tab room
+
+        jsr print_room_layout   ; instantly update the result to screen
+        
+       
+
+        jmp @done
+ 
+ 
+;*******************************************************************************
+; P R I N T   R O O M           read room description and store off-screen ready for scrolling                                            
+;*******************************************************************************
+
+print_room 
+
+        lda #$00                ; off screen scroll store $3c00
+        sta $45c                ; storing in memory $45c - $45d
+        sta $0
+
+        lda #$3c
+        sta $45d
+        sta $1
+
+        lda #0
+        sta $443                ; set title flag
+          
+@clean_room  
+
+        ldy #0  
+        lda #32                 ; blank chr to overwrite
+   
+@clean_loop                     ; in the name of compactness, this routine erases the first 28 bytes of message area ( $3de2 - $3dfe ) without consequence 
+      
+        sta ($0),y
+        inc $1                  ; clean 2 pages
+        sta ($0),y 
+        dec $1
+
+        dey
+        bne @clean_loop  
+
+        sty $443
+
+        lda $45a                ; absolute room pointers
+        sta $441                ; store temp room pointer
+        sta $0
+
+        lda $45b        
+        sta $442          
+        sta $1
+
+@room_state                          
+
+        lda ($0),y              ; 0)     $473 holds room state ( whether its open or closed )
+        sta $473
+        iny                     ; next      
+@layout
+
+        lda ($0),y              ; 1)     room layout ( 8 bit )
+        sta $436
+
+        iny                     ; next
+        lda ($0),y              ; 2)     player position within layout
+        sta $437
+        iny                     ; next
+       
+print_main_body                 ; room description starts here
+
+        lda #0
+        sta $443
+
+        ldy #18                 ; y = 19 is beginning of room description         
+        
+
+;*******************************************************************************
+
+unzip                           ; take data from room description and create two bytes from one
+                                ; both MSB & LSB each represents a byte or letter
+        
+        iny                     ; next byte from room description / y = 19 on first contact
+                                ; or zero if coming here from print_messages
+        
+        lda #0
+        sta $448                ; reset the alt_chrset flag
+
+        cpy #0                  ; if y = 0 then turn page
+        bne @store_title        ; else check_title
+        
+        inc $442                ; turn page
+
+        lda $443                ; if title flag = 0 then store_title
+        cmp #1
+        beq @MSB                ; else @MSB
+
+@store_title
+        
+        cpy #31                 ; 12 byte allowance for title ( Y = 19 + 12 = 31 )
+        bne @MSB
+       
+        lda #80                 ; hard code cursor position to 3rd line
+        sta $45c                ; and start storing room description from there 
+
+        lda #1                  ; reset title flag
+        sta $443
+
+;*******************************************************************************
+
+@MSB   
+        lda ($0),y
+        and #%11110000
+        cmp #0                  ; if a < 16 then set alt chr_set flag                               
+        bne @find_chr  
+
+        lda #1                  ; set alt flag 
+        sta $448
+        jmp LSB                
+  
+@find_chr                  
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+get_chr
+        lda chr_set,x
+        jsr store_room_data      
+LSB
+        lda ($0),y      
+        and #%00001111                            
+        cmp #0                               
+        beq unzip           
+  
+@get_chr
+        tax
+
+        lda $448
+        cmp #1
+        beq @alt_chrset
+
+        lda chr_set,x
+        jmp @store
+
+@alt_chrset
+        
+        lda alt_set,x
+        cmp #15
+        beq @terminate
+        jmp @store
+
+@terminate
+
+        lda $1
+        cmp #>messages          ; if sent here from print_messages then skip capitals
+        bne @capitals
+
+        lda #96                 ; place an end marker in text and store
+        jsr store_room_data
+        rts                     ; EXIT routine
+
+@capitals        
+        jsr capitals            ; capitalise each letter following a full stop 
+        lda #1
+        sta $496
+        jsr detect
+        lda #0
+        sta $496
+        rts                     ; EXIT routine              
+@store       
+        jsr store_room_data       
+        jmp unzip               ; get more letters
+
+       
+;*******************************************************************************     
+   
+store_room_data    
+
+        sta $45e        ; character is stored / obtained from MSB and LSB routines above
+
+        tya             ; store y to stack
+        pha
+       
+        ldy #0
+
+        lda $45c        ; Y pointers ( This is a reused mem location which is now decimal 80 or $50 hex - 3rd line on screen )
+        sta $0   
+        lda $45d
+        sta $1
+
+@store
+        lda $45e        ; character 
+        sta ($0),y      ; stores character into the off screen scroll area starting from 3rd line or $3c50
+        
+        inc $45c        ; tab along   
+ 
+        lda $45c        ; has $45c has rolled over to next page ?
+        cmp #0         
+        bne @restore    ; no
+        inc $45d        ; yes, inc page
+
+@restore                ; restore Y pointers to read next character in room data
+        
+        lda $441        ; LSB rooms or messages
+        sta $0       
+        lda $442        ; MSB rooms or messages
+        sta $1
+
+        pla             ; restore y
+        tay
+  
+        rts
+
+;*******************************************************************************  
+      
+capitals                        ; last part of print_room
+
+        ldy #0
+
+        lda #$00                ; Set Y pointer to point at off screen scroll area
+        sta $0
+        lda #$3c
+        sta $1
+        
+        lda $3c00               ; capitalise the very first letter of title 
+        clc
+        adc #64                 ; convert the character to uppercase
+        sta $3c00               ; and store it 
+
+@loop0                          ; capitalise the title
+        iny
+
+        cpy #15                 ; scan entire length of title ?
+        bcs @first_letter       ; yes
+                                ; no
+        lda $3c00,y             ; load next chr
+        cmp #32                 ; found a space ? ( denotes end of word )
+        bne @loop0              ; no
+
+        iny                     ; yes , move to first letter of next word
+        lda ($0),y              ; load
+        clc
+        adc #64                 ; capitalise
+        sta ($0),y              ; and store
+
+        jmp @loop0              ; check for more
+
+
+@first_letter                   ; convert first letter of room description to uppercase
+      
+        ldy #80                 ; start of 3rd row
+        lda ($0),y              ; load
+        adc #63                 ; convert to uppercase
+        sta ($0),y              ; store
+
+                                ; *** main body *** - now cpaitalise every letter following a full stop      
+@loop1      
+
+        lda ($0),y              ; read next character from off screen scroll area 
+        cmp #96
+        beq @return             ; if a = end marker then return 
+
+        cmp #46                 ; if a = full stop then convert
+        beq @convert            
+        
+        iny                     ; else read next byte
+
+        cpy #0                  ; if y = 0 then turn page
+        bne @loop1              ; else loop
+
+        inc $1                  ; turn page
+        jmp @loop1             
+
+@return                         ; yes    
+        rts                     ; EXIT routine
+
+@convert
+        iny
+        cpy #0                  ; end of page ?
+        bne @con                ; no
+        inc $1                  ; yes, turn page
+@con
+        lda ($0),y              ; load in the next letter to be capitalised     
+        cmp #32                 ; is it a space ?
+        beq @convert            ; yes, keep looking for a letter
+        
+
+@uppercase                      ; no, found a letter
+        clc
+        adc #64                 ; convert letter to uppercase
+        sta ($0),y              ; store it     
+        jmp @loop1              ; and check for more letters
+
+
+;*******************************************************************************
+; P R I N T   M A P
+;*******************************************************************************
+
+
+
+;*******************************************************************************
+; P R I N T   R O O M   L A Y O U T
+;*******************************************************************************
+
+print_room_layout    
+                        ; byte 1 of each room defines its layout
+                        ; this byte is read by the print_room routine and stored at $436 before coming here
+
+                        ; the following routine takes that byte and checks all 8 bits
+                        ; if any bit is switched on then it displays one of eight possible boxes on the righthand side of screen
+                        ; to build a picture of that rooms layout
+
+
+
+        
+
+        lda #0          ; reset y
+        sta $488
+
+@clear_layout           ; clear the previous layout
+
+        ldy #11      
+        lda #32         ; blank chr
+@loop1          
+        sta $8222,y
+        sta $824a,y
+        sta $8272,y
+        sta $829a,y        
+        dey
+        bne @loop1  
+
+@bit_checking
+
+                        ; now check each bit
+@bit7
+        lda $436                
+        and #%10000000          
+        cmp #128        ; is bit 128 on ?          
+        bne @bit6       ; no, check next bit 
+        ldy #0          ; yes, now give Y this specific value  
+        jsr @print      ; so that it knows where to print a box
+ 
+@bit6                   ; check next bit
+        lda $436            
+        and #%01000000
+        cmp #64
+        bne @bit5
+        ldy #3
+        jsr @print 
+@bit5
+        lda $436               
+        and #%00100000
+        cmp #32
+        bne @bit4
+        ldy #6
+        jsr @print 
+@bit4
+        lda $436              
+        and #%00010000
+        cmp #16
+        bne @bit3
+        ldy #9
+        jsr @print
+@bit3
+        lda $436               
+        and #%00001000
+        cmp #8
+        bne @bit2
+        ldy #80
+        jsr @print
+@bit2
+        lda $436              
+        and #%00000100
+        cmp #4
+        bne @bit1
+        ldy #83
+        jsr @print
+@bit1
+        lda $436               
+        and #%00000010
+        cmp #2
+        bne @bit0
+        ldy #86
+        jsr @print
+@bit0
+        lda $436             
+        and #%00000001
+        cmp #1
+        bne @done_layout
+        ldy #89 
+        jsr @print
+
+@done_layout
+
+        jsr print_player_layout ; now display where the player is within the room
+
+        rts
+       
+@print                          ; prints area to screen
+
+       ; sta $8222,y
+;        sta $824a,y
+;        sta $8272,y
+;        sta $829a,y 
+
+        ldx #255
+
+        lda #108 
+        sta $8223,y       
+        lda #110
+        sta $8224,y
+
+        lda #109
+        sta $824b,y
+        lda #125
+        sta $824c,y 
+              
+@check_room
+
+        tya
+        pha
+        sta $488                ; store y for printing
+
+@loop2
+        inx
+        lda locked_areas,x      ; if data = room address
+        cmp $45a
+        beq @check_area         ; then check-area
+        cmp #$ff                ; if end of data then restore y and return
+        bne @loop2              ; else loop
+        
+        pla                     ; restore y
+        tay
+        rts                     ; back to bit checking
+         
+@check_area
+        
+        inx
+        lda locked_areas,x      ; if y = area then print area locked
+        cmp $488
+        bne @loop2              ; else loop
+        
+        lda #112                ; locked chr
+        sta $8223,y
+      
+        pla                     ; restore y
+        tay
+        rts                     ; back to bit checking
+        
+
+;*******************************************************************************
+
+print_player_layout
+                                ; same process as above but uses byte 2 of room data
+                                ; this byte is held at $437 and is read by the print_room routine
+
+                                ; it defines the position of the player within a room
+                                ; by placing to screen a filled box into the layout
+        lda #0
+        sta $48c                ; reset current area flag
+
+   
+
+@player7
+        lda $437                ; load player position
+        and #%10000000          
+        cmp #128                ; is it bit 128 ?                
+        bne @player6            ; no, check next bit
+        ldy #0                  ; yes, give Y this specific value
+        jsr @print_player       ; so that it knows where to fill box
+ 
+@player6                        ; check next bit
+        lda $437            
+        and #%01000000
+        cmp #64
+        bne @player5
+        ldy #3
+        jsr @print_player 
+@player5
+        lda $437             
+        and #%00100000
+        cmp #32
+        bne @player4
+        ldy #6
+        jsr @print_player 
+@player4
+        lda $437            
+        and #%00010000
+        cmp #16
+        bne @player3
+        ldy #9
+        jsr @print_player
+@player3
+        lda $437            
+        and #%00001000
+        cmp #8
+        bne @player2
+        ldy #80
+        jsr @print_player
+@player2
+        lda $437            
+        and #%00000100
+        cmp #4
+        bne @player1
+        ldy #83
+        jsr @print_player
+@player1
+        lda $437             
+        and #%00000010
+        cmp #2
+        bne @player0
+        ldy #86
+        jsr @print_player
+@player0
+        lda $437               
+        and #%00000001
+        cmp #1
+        bne @done
+        ldy #89
+
+@done 
+        rts
+
+@print_player
+
+        lda #126
+        sta $8223,y
+        lda #123
+        sta $8224,y
+        lda #124
+        sta $824b,y
+        lda #126
+        sta $824c,y
+
+@locked_room
+
+        tya
+        pha
+        sta $489                ; store y
+
+        ldx #255
+
+        lda #0
+        sta $48f
+
+@loop2
+        inx
+        lda locked_areas,x
+        cmp #$ff
+        beq @end
+        cmp $45a                ; if data = room address
+        bne @loop2              ; then check player within area
+ 
+@print_lock
+        
+        inx
+        lda locked_areas,x      ; if data = y ( area ) then print locked room
+        cmp #$ff
+        beq @end
+        cmp $489                ; = y ?
+        bne @loop2              ; else loop back
+        
+        lda #108                ; lock chr
+        sta $8223,y             ; store to screen + y
+
+        lda #1                  ; set flag - current area is locked  ( used in detect rountine )
+        sta $48c 
+
+        sta $48f                ; flag that tells tab room to reset $438 ( tab ) / cannot do it here because player might want to perform
+                                ; another action such as drop an object at current area location   
+@end
+        pla                     ; restore y
+        tay
+        rts
+
+
+;*******************************************************************************
+; T A B   R O O M
+;*******************************************************************************
+
+tab_room
+
+                                ; this routine comes here from IRQ when the space bar is pressed
+                                ; It takes two bytes from the current room description ( bytes 1 & 2 )
+                                ; the layout byte and the player position within the room or layout
+
+                                ; each time the player presses the space bar ( and only when the cursor is at the zero position )
+                                ; the players position is cycled through the rooms layout
+
+                                ; if the players position does not follow the room layout pattern, then the program
+                                ; loops back until it does and only then updates the position 
+
+                                ; this routine EOR's the layout byte and AND's it with the player position byte
+                                ; if they are equal then $437 ( player position ) is halfed each time so that it can cycle through and check all 8 bits
+
+                                ; start -
+
+
+        
+
+        lda $48f                ; if currently on a locked area then reset tab to start
+        cmp #0
+        beq @con
+
+        lda #0
+        sta $438
+        lda #1
+        sta $437
+        jmp @con2
+
+@con
+
+        inc $438                ; tab counter ( area within room )
+
+
+@con2
+                                ; check tab counter is within limits  ( 0 - 7 )
+        lda $438                ; tab counter
+        cmp #8                  ; > 7 ? 
+        bne @main               ; no
+        lda #0                  ; yes
+        sta $438                ; reset tab counter to zero
+
+            
+
+@main
+        lda $437                ; load player position within the room
+        lsr                     ; and half it
+        cmp #0                  ; equals zero ?
+        bne @tab_sub            ; no       
+        lda #128                ; yes, set bit 7
+        
+@tab_sub
+        sta $437                ; update new value
+        lda $436                ; load layout byte
+        eor #%11111111          ; and invert it
+        and $437                ; does player position equal (bitwise) the inverted layout byte ?
+        bne tab_room            ; yes, therefore go through the routine until it does not equal
+       
+@tab     
+
+        jsr print_room_layout   ; no, not equal, update player position within room layout 
+                                ; and highlight text
+       
+
+        
+;*******************************************************************************
+; H I G H L I G H T E R          
+;*******************************************************************************
+
+                                ; this routine highlights predefined words on the screen within the main body of text ( room description )
+                                ; depending on which area of the room the player is located ( on the layout )
+                                ; matching highlight infomation is retrieved from room data
+
+                                ; highlight data corresponds to whole words not individual characters or bytes
+                                ; it does this by searching for the spaces between words.
+
+                                ; there are a maximum of 8 possible highlighted words per room, just as there are 8 possible layout locations within a room
+                                ; if the first highlight data for example reads 15, then this routine will look for the 15th space within the main body of text, ie word
+                                ; and reverse all the adjacent characters to the right of that space until it detects another
+          
+
+highlighter                     ; this is a continuation of the routine above
+
+        
+        jsr update_room         ; refresh all the text on screen ( room description only ) before including the next highlight, this clears the previous highlight
+        
+        lda #0
+        sta $479                ; reset hightlight counter
+        sta $459                ; reset simple counter
+
+        lda $45a                ; point to current room data ( absolute room pointers )
+        sta $0
+        lda $45b
+        sta $1
+
+        clc
+        lda $438                ; and read its highlight data / each rooms highlight data starts at byte 11 
+        adc #11                 ; add offset / player tab counter value                 
+                 
+        tay                     ; and transfer to y
+        lda ($0),y              ; load highlight data 11 + y
+        sta $479                ; and update new highlight tab value
+
+        lda #$50                ; point to screen / position $50 = start of 3rd line where main body of room description starts
+        sta $0
+        lda #$80
+        sta $1
+        
+        ldy #0
+@loop1
+        iny
+        cpy #0                  ; room descriptions can contain up to 420 charaters per location so check if y pointer has crossed a page ?
+        bne @sub                ; no
+        inc $1                  ; yes, turn page
+@sub
+        lda ($0),y              ; read screen
+        cmp #32                 ; found a space ?
+        bne @loop1              ; no, keep looking
+        inc $459                ; add 1 to simple counter
+        lda $459                ; load simple counter
+        cmp $479                ; does it equal tab counter ?
+        bne @loop1              ; no, keep looking
+
+        clc                     ; yes
+@loop2
+        iny
+        lda ($0),y              ; scan the screen                  
+        cmp #32                 ; if a = space or a = full stop then leave
+        beq @leave             
+        cmp #46                 
+        beq @leave
+        adc #128                ; invert character
+        sta ($0),y              ; and store it to screen
+        jmp @loop2
+@leave
+        jsr detect
+        rts                     ; return to IRQ
+
+
+;*******************************************************************************
+; E N D                                                             
+;*******************************************************************************
+              
+end
+        brk                                     ;test command
+
+;*******************************************************************************
+; H E L P                                                               
+;*******************************************************************************
+
+help                                            ; the command 'HELP' simply lists all commands available to the user
+
+        
+        
+end_prog
+
+        brk
+
+;*******************************************************************************
+; D A T A   T A B L E S                                                              
+;*******************************************************************************
+
+
+logo1   text '              ./shdmdhs/                '
+        text '            /dMMMMMMMMMMMh:             '
+        text '          :dMMMMMMMMMMMMMMMd-           '
+        text '         oNMMnnnMMMMMMMMMmoMN+          '
+        text '        sMMMnnnnnMMMMMm/-  mMNo         '
+logo2   text '       sNMMMnnnnMMMMMh.    hMMNo        '
+        text '      /NMMMMMnnnMMMMs     sMMMMN:       '
+        text '      mMMMMMMMMMMMMm/     mMMMMMm       '
+        text '     +MMMMnnMMMMMMm.     :MMMMMMM/      '
+        text '     mMMMnnnMMMmdo.      yMMMMMMMh      '
+logo3   text '    .MMMMnnMMy:          NMMMMMMMN      '
+        text '    :MMMMMMN/           +MMMMMMMMM-     '
+        text '    /MMMMMN:            hMMMMMMMMM:     '
+        text '    /MMMMM+             NMMMnnMMMM:     '
+        text '    -MMMNs             +MMMnnnnMMM.     '
+logo4   text '     hso:  .      .    NMMMnnnnMMN      '
+        text '     y:  ./d      s/ .-MMMMMnnnMMy      '
+        text '     /NdhmMM.  -  yy. oMMMMMMnMMM:      '
+        text '      mMMMN/    . sh- hMMMMMooMMh       '
+        text '      :NMM:         . dMMMMMooMN-       '
+logo5   text '       +mo            -/+mMMMMN/        '
+        text '        .                .yysh+         '
+        text '                                        '
+        text '                                        '
+        text ' l o n e  w o l f   a d v e n t u r e s '
+        byte 0
+
+
+title
+
+        text '   A   S   C   E   N   S   I   O   N '
+
+
+
+hieroglyphs
+        ;     Z             B            X            Q            C            J   K            K   E            -  0         P   O          N   M
+        ;byte 218,32,32,32,194,32,32,216,32,32,32,209,32,32,32,195,32,32,32,202,203,32,32,32,203,197,32,32,32,223,233,32,32,208,207,32,32,206,205,32
+
+        byte 32,32,32,32,32,32,32,66,32,32,88,32,32,89,32,32,15,32,32,87,32,32,17,32,32,90,32,32,2,32,32,6,32,32,32,32,32,32,32,32
+
+      
+
+;B X Y o W q Z b f
+
+
+
+;*******************************************************************************
+; Commands
+
+single_commands
+       
+        byte 14                         ; n (1)
+        byte 19                         ; s (2)
+        byte 5                          ; e (3)
+        byte 23                         ; w (4)
+        byte 12                         ; l (5) look
+        byte $ff
+
+commands
+
+        byte 0,8,5,12,16                          ; help (8)
+        byte 0,5,14,4                             ; end (3)
+        byte $ff
+
+        
+;*******************************************************************************       
+
+list_commands   ; When the player types HELP, these are displayed
+
+                                        ;Recognized commands  
+
+        byte 18,5,3,15,7,14,9,26,5,4,32,3,15,13,13,1,14,4,19,32,45,0,0 
+
+        
+        byte 16,21,12,12,44                     ;pull
+        byte 16,21,19,8,44                      ;push
+        byte 20,9,5,44                          ;tie
+        byte 21,14,20,9,5,44                    ;untie
+        byte 20,8,18,15,23,44                   ;throw
+        byte 15,16,5,14,0                       ;open
+        byte 3,12,15,19,5,44                    ;close
+        byte 12,15,3,11,44                      ;lock
+        byte 21,14,12,15,3,11,44                ;unlock
+        byte 5,14,20,5,18,44                    ;enter
+        byte 12,5,1,22,5,44                     ;leave
+        byte 5,24,9,20,32,22,9,1,0              ;exit via
+        byte 7,15,20,15,44                      ;goto
+        byte 18,5,1,4,44                        ;read
+        byte 12,15,15,11,44                     ;look
+        byte 19,20,21,4,25,44                   ;study
+        byte 9,14,22,5,14,20,15,18,25,44        ;inventory
+        byte 16,1,20,8,44,0                     ;path
+        byte 19,20,5,16,32,15,14,44             ;step on
+        byte 5,14,4,255                         ;end
+
+;*******************************************************************************
+; Messages
+
+messages
+;                                               page , y , message
+
+        byte 101,95,226,112,4,244,97,232,15     ; 0  , 0 , too many items
+        byte 199,32,2,145,15                    ; 0  , 9 , unable
+
+
+
+      
+
+
+
+
+;*******************************************************************************
+; object_location
+;*******************************************************************************
+
+object_location
+
+        ; These memory locations can be changed by the player
+        ; by picking up and dropping objects during the game
+
+        ; the order in which they appear here in the object_location data table 
+        ; corresponds to the objects data table below.
+
+        ; eg, ALL is 0, BOOK is 1, APPLE is 2 etc etc
+        ; Looking at the objects table , number 1  ( id code ) is also BOOK
+        
+        
+        byte $5b    ; 0 apple    
+        byte $5f    ; 1 book
+        byte $5b    ; 5 cup
+        byte $5b    ; 3 diving suit
+        byte $5b    ; 4 hammer
+        byte $5b    ; 2 key
+        byte $5b    ; 6 lamp
+        byte $5b    ; 7 scales
+
+        byte $ff
+
+  
+;*******************************************************************************
+; object area
+;*******************************************************************************
+object_area
+
+        
+        byte 1 ; apple
+        byte 0 ; book
+        byte 3 ; cup
+        byte 2 ; diving suit
+        byte 3 ; hammer
+        byte 0 ; key       
+        byte 5 ; lamp
+        byte 6 ; scales
+
+        byte $ff
+ 
+;*******************************************************************************
+
+objects ; 1st number represents the objects identification, 
+        ; The last number 255 is used by the program to detect end of word,
+        ; and the numbers in between are the objects description
+              
+        
+                                                        ; anything in this table under #65 is an object ID
+                                                        ; - for space, please use #96 instead of #32 eg diving suit 
+
+                                                        ; in aplhabetical order
+
+        
+        byte 0,65,80,80,76,69,255                       ; APPLE
+        byte 1,66,79,79,75,255                          ; BOOK 
+        byte 2,67,85,80,255                             ; CUP
+        byte 3,68,73,86,73,78,71,96,83,85,73,84,255     ; DIVING SUIT
+        byte 4,72,65,77,77,69,82,255                    ; HAMMER         
+        byte 5,75,69,89,255                             ; KEY
+        byte 6,76,65,77,80,255                          ; LAMP        
+        byte 7,83,67,65,76,69,83,255                    ; SCALES
+
+        byte 254                                        ; terminates list
+
+        ; currently 53 bytes in table
+
+;*******************************************************************************
+
+
+table   ; jump table
+
+        byte <scroll_text_north
+        byte >scroll_text_north
+
+        byte <scroll_text_south
+        byte >scroll_text_south
+
+        byte <scroll_text_east
+        byte >scroll_text_east
+
+        byte <scroll_text_west
+        byte >scroll_text_west
+
+        byte <end_prog
+        byte >end_prog
+
+;*******************************************************************************
+; L O C K E D   A R E A S
+;*******************************************************************************
+
+locked_areas ; area
+
+;       room layout
+
+;       [  0,0  ]  [ 3,1  ]  [ 6,2  ]  [ 9,3 ]
+;       [ 80,4 ]  [ 83,5 ]  [ 86,6 ]  [ 89,7 ]      
+                        
+;       LSB room, layout
+
+        byte $5b,3
+        byte $bf,6       
+        byte $ff
+
+locked_area_bits;        to lock a room, LSB room , locked_area, locked_bit
+;                       and to unlock a room both matching values must be out of range eg 90,08
+
+        byte $5b,1
+        byte $bf,2
+        byte $ff
+
+drop_check
+                ; dropping an object in a room and area specified below unlocks that area
+  
+                ; object number, room, area
+        
+        byte 5,$5b,1
+        byte $ff
+
+get_check
+                ; getting an object in the room and area specified below locks that area
+       
+        byte 5,$5,1
+        byte $ff
+
+
+
+;             text compression code table  ( Huffman Code )
+        
+;             16   32   48   64   80   96  112  128  144  160  176  192  208  224  240      MSB val  
+;        sw    e    a    r    i    o    t    n    s    l    c    d    u    h    m  spc      chr set 1              
+;      0000 0001 0010 0011 0100 0101 0110 0111 1000 1001 1010 1011 1100 1101 1110 1111      pattern                          
+;       nop    g    b    f    y    w    k    v    x    j    q    p    Z    .    ,  end      chr set 2              descriptions end with 15 
+;         0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15      LSB val                            
+
+
+chr_set
+        byte 0,5,1,18,9,15,20,14,19,12,3,4,21,8,13,32
+alt_set 
+        byte 0,7,2,6,25,23,11,22,24,10,17,16,26,46,44,15
+
+
+
+        ; date
+
+        ; 21 01 2021
+
+
+
+
+
+
