@@ -1,0 +1,30 @@
+# Ascension
+Text Adventure Game
+
+       *** A s c e n s i o n ***
+
+   A text adventure game for the C64
+
+
+Welcome to Ascension, an isolated volcanic island in the mid-Atlantic, lying about one thousand miles off the west coast of Africa and some sixteen hundred miles east of Brazil. Ascension is governed as part of the British Overseas Territories with Georgetown acting as entry point for overseas visitors. The year is 1965 and despite it's name, Georgetown would be better described as a village. The island's population declined sharply after De Beers closed it's mining operations here in 1953. The population today stands at just 85.
+
+Islanders rely mainly on fishing for their income and offer intrepid of travellers the occassional guided tours up Green Mountain and it's creator lake. Set back from the picturesque harbour is Georgetown's center, a small cobbled square that's faced by St Mary's church, a storybook mix of pretty white-washed cottages, an olde post office and the islands only pub, the Friars Inn. 
+
+There's no airstrip on Ascension, no plane could ever hope to cover the distance. To get here, travellers need to board a supply ship that departs Walvis Bay on Namibia's skeleton coast once a month. The most stand out feature as you approach the island is Green Mountain, a breathtaking caldera type volcano that looms over the horizon sweeping majestically skyward to a height of nine and a half thousand feet. When it's upper slopes aren't enveloped in a layer of cloud, you can see the old Monastery built in the simple Cistercian architectial style situated on a rocky outcrop at about four thousand feet. The Monastery was home to the brethren order for about 300 years. The Monastery remains a bit of an enigma. Not much is known. What we do know is recorded in the book that it dates back to the time of the English Reformation and built as a sanctuary by order of the Pope after King Henry VIII' dissolution of the monasteries in 1536. An organized expedition is expected to be announced in the coming months which hopes to access to the Monastery. If successful, it will be the first time the outside world learns of this incredibly isoltated and mystrious place and shed some light into the lives of it's brethern sect. 
+
+
+Heading out of Georgetown on the islands only sealed road takes you past the old De Beers mining works and the remains of numerious corrugated tin shacks which must have onced house it's workers. Some of the mine are said to run right under Georgetown itself. The road forks a little further on with the lower road continuing east, while the other climbs north becoming increasingly inclined, degraded and overgrown as it meanders it's way towards the monastery. Sometime in the late 17th century, the higher elevations of the road were lost due to a major landslide and as a result there's no way to reach it today. This hasn't prevented the adventure types from trying of course. Rock falls are common and locals are often engaged in recusing the ill-prepared from it's treacherous slopes.
+
+There was, however, one exception. In 1896 an gentleman in his late sixties by the name of James Augustus, a retired Lecturer from Penn State university had visited the island. Taking up lodgings at the Friars Inn he spent most evenings drinking with locals buying beers for anyone willing to listen to his wild stories of plundered treasures and outlandish theories about the Monastery. Naturally he became very popular. During the day he was unusually quiet and reserved, preferring instead to keep to himself and was often seen walking around the village examining things up close. One on particular evening he made an announcement -
+
+"At first light I shall journey to Green Mountain, scale it's slopes, enter the Monastery, lay claim to its treasures therein and raise my lantern from it's bell tower for all to see."
+
+Fishermen landing their early morning catch waved him off as he set out along the road towards Green Mountain. As the sun went down, the locals assembled in the village square as instructed and were astonished to see his lantern from the bell tower and heard it's bell toll. Sadly he was never seen again. Nobody quite knows how he managed to get up there or why he failed to return. Augustus was both a sholar of classical antiquity and ancient Mesoamerican history. He come to be on Ascension due to his own personal obsession with the Maya civilization and his belief that there was somehow a link with it's Monastery. 
+
+His story goes something like this - During the reign of King Philip II of Spain, numerous expeditions to the New World were taking place. The Conquistadors were plundering ancient Mayan cities in central America and returning with galleons laden with treasure to help finance the King's war with England. However, the Conquistadors being greedy for wealth and power devised a plan to keep as much of the gold for themselves. On returning from one particularly successful expedition they stopped off at Ascension Island and deposited half of all their treasure with the Monastery.
+
+They offered the Monks a sizable donation in return for it's safe keeping and vowed to return the following year to collect it, but as the years rolled by and no sign of the Conquistadors returning, the monks used the treasure to improve their own impoverished lives and the lives of the islanders. They built St Mary's church, the village square, cottages for the fishermen, fortified the harbour, and replaced the treatrious path leading to the Monastery with a gravel road.
+
+It is known that the Monks did occasionally visit the village to exchange strange gold figurines and artifacts for everyday mundane items such as tools and weaved baskets. How they came to be in possession of the gold seems to have given much credence to his story.       
+People living on the island claim that on some evenings, if you lay quietly in your bed you can hear through an open window the faintly distant ringing of a lone bell at the Monastery, with some even claiming to have seen the ghost of James Augustus roaming the village at night.
+
