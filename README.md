@@ -6,7 +6,7 @@ Text Adventure Game
    A text adventure game for the C64
 
 
-Welcome to Ascension, an isolated volcanic island in the mid-Atlantic, lying about one thousand miles off the west coast of Africa and some sixteen hundred miles east of Brazil. Ascension is governed as part of the British Overseas Territories with Georgetown acting as entry point for overseas visitors. The year is 1965 and despite it's name, Georgetown would be better described as a village. The island's population declined sharply after De Beers closed it's mining operations here in 1953. The population stands at just 85 today.
+Welcome to Ascension, an isolated volcanic island in the mid-Atlantic, lying about one thousand miles off the west coast of Africa and some sixteen hundred miles east of Brazil. Ascension is governed as part of the British Overseas Territories with Georgetown acting as entry point for overseas visitors. The year is 1965 and despite it's name, Georgetown is better described as a village. The island's population declined sharply after De Beers closed it's mining operations here in 1953. The population stands at just 85 today.
 
 Islanders rely mainly on fishing as a source of income but suppliment this by offering intrepid visitors the occassional guided tours up Green Mountain and it's creator lake. Set back from the picturesque harbour is what's considered Georgetown's heart, a small cobbled square faced by St Mary's church, a storybook mix of pretty white-washed cottages, an olde post office and the islands only pub, the Friars Inn and where you have rented a room for the duration of your stay. 
 
